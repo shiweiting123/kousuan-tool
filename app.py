@@ -1,226 +1,338 @@
 import streamlit as st
 import random
-import json
-from datetime import datetime
 
-# 页面设置
+# 页面基础设置
 st.set_page_config(page_title="AI口算错题本", layout="centered")
 
-# 样式
+# 1. 还原你截图的暖黄风格样式
 st.markdown("""
 <style>
-.main {
-    background: linear-gradient(145deg, #f9f0d4 0%, #f4e5c1 100%);
+/* 全局背景 */
+.stApp {
+    background: linear-gradient(180deg, #fff3d9 0%, #ffe9c2 100%);
     padding: 1rem;
-    border-radius: 24px;
 }
-.q-text {
-    font-size: 2.8rem;
+
+/* 主卡片 */
+.main-card {
+    background: #fff9e8;
+    border-radius: 24px;
+    padding: 24px;
+    max-width: 500px;
+    margin: 0 auto;
+    box-shadow: 0 8px 24px rgba(139, 60, 28, 0.15);
+}
+
+/* 标题 */
+.title {
     text-align: center;
+    font-size: 24px;
     color: #8b3c1c;
     font-weight: bold;
-    margin: 1rem 0;
+    margin-bottom: 16px;
 }
-.feedback {
-    padding: 0.8rem;
-    border-radius: 16px;
+
+/* 输入框行 */
+.input-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.stTextInput>div>div>input {
+    border-radius: 12px;
+    border: 1px solid #e6c89c;
     text-align: center;
+}
+
+/* 难度按钮 */
+.difficulty-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.diff-btn {
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+}
+.diff-btn.active {
+    background-color: #d97706;
+    color: white;
+}
+.diff-btn:not(.active) {
+    background-color: #f0e2ca;
+    color: #8b3c1c;
+}
+
+/* 一键出题按钮 */
+.gen-btn {
+    display: block;
+    margin: 0 auto 16px auto;
+    background-color: #2f855a;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 20px;
     font-weight: bold;
 }
-.correct {
-    background: #e2f3e2;
-    color: #1f6d2b;
-}
-.wrong {
-    background: #ffe6e6;
-    color: #b13e3e;
-}
-.weak-tag {
-    background: #e86c3a;
-    color: white;
-    padding: 4px 10px;
+
+/* 诊断提示 */
+.diagnose-box {
+    background-color: #fff3d9;
+    padding: 10px;
     border-radius: 12px;
-    margin: 3px;
-    display: inline-block;
-    font-size: 0.8rem;
+    text-align: center;
+    color: #8b3c1c;
+    margin-bottom: 16px;
+}
+
+/* 题目卡片 */
+.q-card {
+    background-color: #fff3d9;
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 16px;
+}
+.q-text {
+    font-size: 48px;
+    color: #8b3c1c;
+    font-weight: bold;
+    margin-bottom: 16px;
+}
+.ans-input {
+    width: 120px;
+    margin: 0 auto;
+}
+
+/* 操作按钮组 */
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.btn {
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: none;
+    font-weight: bold;
+    color: white;
+}
+.btn-check { background-color: #d97706; }
+.btn-next { background-color: #718096; }
+.btn-redo { background-color: #e53e3e; }
+.btn-reset { background-color: #4a5568; }
+
+/* 提示文字 */
+.tip-text {
+    text-align: center;
+    color: #8b3c1c;
+    margin-bottom: 16px;
+}
+
+/* 统计行 */
+.stats-row {
+    display: flex;
+    justify-content: space-around;
+    background-color: #f0e2ca;
+    padding: 10px;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 16px;
+}
+.stat-item {
+    background-color: #fff3d9;
+    padding: 6px 12px;
+    border-radius: 10px;
+    color: #8b3c1c;
+    font-weight: bold;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# 初始化状态
+# 2. 初始化会话状态
+if "student_name" not in st.session_state:
+    st.session_state.student_name = ""
+if "student_class" not in st.session_state:
+    st.session_state.student_class = ""
+if "difficulty" not in st.session_state:
+    st.session_state.difficulty = "基础"
+if "questions" not in st.session_state:
+    st.session_state.questions = []
+if "current_idx" not in st.session_state:
+    st.session_state.current_idx = 0
+if "user_ans" not in st.session_state:
+    st.session_state.user_ans = ""
+if "checked" not in st.session_state:
+    st.session_state.checked = False
+if "error_list" not in st.session_state:
+    st.session_state.error_list = []
 if "total" not in st.session_state:
     st.session_state.total = 0
 if "right" not in st.session_state:
     st.session_state.right = 0
-if "error_list" not in st.session_state:
-    st.session_state.error_list = []
-if "current_q" not in st.session_state:
-    st.session_state.current_q = None
-if "answered" not in st.session_state:
-    st.session_state.answered = False
-if "user_ans" not in st.session_state:
-    st.session_state.user_ans = ""
-if "feedback" not in st.session_state:
-    st.session_state.feedback = "💡 认真计算，细心答题"
-if "feedback_cls" not in st.session_state:
-    st.session_state.feedback_cls = "feedback"
 
-# 题型分类
+# 3. 题目生成与分类
 def get_kind(a, b, opt):
     if opt == "+":
-        if (a % 10 + b % 10) >= 10:
-            return "carry_add"
-        else:
-            return "normal_add"
+        return "carry_add" if (a % 10 + b % 10) >= 10 else "normal_add"
     else:
-        if (a % 10) < (b % 10):
-            return "carry_sub"
-        else:
-            return "normal_sub"
+        return "carry_sub" if (a % 10) < (b % 10) else "normal_sub"
 
-kind_map = {
-    "normal_add": {"text": "不进位加法", "color": "#e65100"},
-    "carry_add": {"text": "进位加法", "color": "#d83a34"},
-    "normal_sub": {"text": "不退位减法", "color": "#0a79a2"},
-    "carry_sub": {"text": "退位减法", "color": "#7e4bb2"}
-}
-
-# 出题
-def gen_q(level="基础"):
-    a, b, opt, ans = 0, 0, "+", 0
+def gen_single_q(level):
+    opt = "+" if random.random() > 0.5 else "-"
     if level == "基础":
-        opt = "+" if random.random() > 0.5 else "-"
         if opt == "+":
-            while True:
-                a = random.randint(1, 10)
-                b = random.randint(1, 10)
-                ans = a + b
-                if ans <= 20:
-                    break
+            a, b = random.randint(1, 10), random.randint(1, 10)
+            while a + b > 20:
+                a, b = random.randint(1, 10), random.randint(1, 10)
         else:
-            while True:
-                a = random.randint(5, 15)
-                b = random.randint(1, 10)
-                ans = a - b
-                if ans >= 0:
-                    break
+            a, b = random.randint(5, 15), random.randint(1, 10)
+            while a - b < 0:
+                a, b = random.randint(5, 15), random.randint(1, 10)
     elif level == "进阶":
-        opt = "+" if random.random() > 0.5 else "-"
-        if opt == "+":
-            a = random.randint(10, 35)
-            b = random.randint(5, 30)
-            ans = a + b
-        else:
-            a = random.randint(15, 50)
-            b = random.randint(5, 30)
-            ans = a - b
+        a = random.randint(10, 35) if opt == "+" else random.randint(15, 50)
+        b = random.randint(5, 30)
+        ans = a + b if opt == "+" else a - b
         if ans < 0:
-            return gen_q("进阶")
-    else:
-        opt = "+" if random.random() > 0.5 else "-"
+            return gen_single_q(level)
+    else: # 困难
         if opt == "+":
-            while True:
-                a = random.randint(30, 70)
-                b = random.randint(20, 60)
-                ans = a + b
-                if ans <= 100:
-                    break
+            a, b = random.randint(30, 70), random.randint(20, 60)
+            while a + b > 100:
+                a, b = random.randint(30, 70), random.randint(20, 60)
         else:
-            while True:
-                a = random.randint(50, 99)
-                b = random.randint(10, 49)
-                ans = a - b
-                if ans >= 0:
-                    break
-    kind = get_kind(a, b, opt)
-    return {"a": a, "b": b, "opt": opt, "ans": ans, "kind": kind}
+            a, b = random.randint(50, 99), random.randint(10, 49)
+            while a - b < 0:
+                a, b = random.randint(50, 99), random.randint(10, 49)
+    ans = a + b if opt == "+" else a - b
+    return {"a":a, "b":b, "opt":opt, "ans":ans, "kind":get_kind(a,b,opt)}
 
-# 诊断
+def gen_10_questions(level):
+    return [gen_single_q(level) for _ in range(10)]
+
 def diagnose():
-    errs = st.session_state.error_list
-    if not errs:
-        return "暂无错题，太棒啦！", ""
-    cnt = {"normal_add":0, "carry_add":0, "normal_sub":0, "carry_sub":0}
-    for q in errs:
+    if not st.session_state.error_list:
+        return "暂无错题，太棒啦！"
+    kind_map = {"normal_add":"不进位加法","carry_add":"进位加法","normal_sub":"不退位减法","carry_sub":"退位减法"}
+    cnt = {k:0 for k in kind_map}
+    for q in st.session_state.error_list:
         cnt[q["kind"]] += 1
-    tags = ""
-    for k in cnt:
-        if cnt[k] > 0:
-            tags += f'<span class="weak-tag" style="background:{kind_map[k]["color"]}">{kind_map[k]["text"]} 错{cnt[k]}道</span>'
-    return f"共{len(errs)}道错题", tags
+    weak = [f"{kind_map[k]}错{cnt[k]}道" for k in cnt if cnt[k]>0]
+    return f"薄弱点：{', '.join(weak)}" if weak else "暂无错题，太棒啦！"
 
-# 界面
-st.title("📚 AI口算错题本")
+# 4. 界面主体
+with st.container():
+    st.markdown('<div class="main-card">', unsafe_allow_html=True)
 
-# 难度
-level = st.radio("难度", ["基础", "进阶", "困难"], horizontal=True)
+    # 标题
+    st.markdown('<div class="title">📚 AI口算错题本</div>', unsafe_allow_html=True)
 
-# 诊断
-tip, tags = diagnose()
-st.markdown(f"""
-<div style="background:#fef5e6; padding:12px; border-radius:16px;">
-    <div>AI薄弱诊断：{tip}</div>
-    <div>{tags}</div>
-</div>
-""", unsafe_allow_html=True)
-
-# 生成题目
-if st.button("📝 开始出题"):
-    st.session_state.current_q = gen_q(level)
-    st.session_state.answered = False
-    st.session_state.user_ans = ""
-    st.session_state.feedback = "💡 请输入答案"
-    st.session_state.feedback_cls = "feedback"
-
-# 显示题目
-if st.session_state.current_q:
-    q = st.session_state.current_q
-    st.markdown(f'<div class="q-text">{q["a"]} {q["opt"]} {q["b"]} = ?</div>', unsafe_allow_html=True)
-    ans = st.text_input("答案", value=st.session_state.user_ans, key="ans_input")
-
+    # 姓名/班级输入
     col1, col2 = st.columns(2)
     with col1:
-        if not st.session_state.answered and st.button("✅ 核对"):
-            st.session_state.answered = True
-            st.session_state.total += 1
-            try:
-                u = int(ans)
-            except:
-                st.session_state.feedback = "⚠️ 请输入数字"
-                st.session_state.feedback_cls = "feedback wrong"
-                st.rerun()
-            if u == q["ans"]:
-                st.session_state.right += 1
-                st.session_state.feedback = "🎉 回答正确！"
-                st.session_state.feedback_cls = "feedback correct"
-            else:
-                st.session_state.feedback = f"❌ 正确答案：{q['ans']}"
-                st.session_state.feedback_cls = "feedback wrong"
-                exist = any(x["a"]==q["a"] and x["b"]==q["b"] and x["opt"]==q["opt"] for x in st.session_state.error_list)
-                if not exist:
-                    st.session_state.error_list.append(q)
+        st.session_state.student_name = st.text_input("姓名", value=st.session_state.student_name, label_visibility="collapsed", placeholder="姓名")
     with col2:
-        if st.session_state.answered and st.button("➡️ 下一题"):
-            st.session_state.current_q = gen_q(level)
-            st.session_state.answered = False
-            st.session_state.user_ans = ""
-            st.session_state.feedback = "💡 请输入答案"
-            st.session_state.feedback_cls = "feedback"
-            st.rerun()
+        st.session_state.student_class = st.text_input("班级", value=st.session_state.student_class, label_visibility="collapsed", placeholder="班级")
 
-# 反馈
-st.markdown(f'<div class="{st.session_state.feedback_cls}">{st.session_state.feedback}</div>', unsafe_allow_html=True)
+    # 难度选择按钮
+    cols = st.columns(3)
+    for i, diff in enumerate(["基础", "进阶", "困难"]):
+        with cols[i]:
+            if st.button(diff, key=diff, use_container_width=True):
+                st.session_state.difficulty = diff
+                st.rerun()
+    st.markdown(f"""
+    <style>
+    div[data-testid="stHorizontalBlock"] button:nth-child({["1","2","3"][["基础","进阶","困难"].index(st.session_state.difficulty)]}) {{
+        background-color: #d97706;
+        color: white;
+        font-weight: bold;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
-# 统计
-acc = round(st.session_state.right/st.session_state.total*100) if st.session_state.total>0 else 0
-st.markdown(f"""
-<div style="background:#f0e2ca; padding:12px; border-radius:16px; text-align:center;">
-总题：{st.session_state.total} | 做对：{st.session_state.right} | 错题：{len(st.session_state.error_list)} | 正确率：{acc}%
-</div>
-""", unsafe_allow_html=True)
+    # 一键出题按钮
+    if st.button("📝 一键出10道题", use_container_width=True, type="primary"):
+        st.session_state.questions = gen_10_questions(st.session_state.difficulty)
+        st.session_state.current_idx = 0
+        st.session_state.user_ans = ""
+        st.session_state.checked = False
+        st.rerun()
 
-# 重置
-if st.button("🔄 重置所有数据"):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.rerun()
+    # 诊断提示
+    st.markdown(f'<div class="diagnose-box">AI薄弱诊断：{diagnose()}</div>', unsafe_allow_html=True)
+
+    # 题目区域
+    if st.session_state.questions:
+        q = st.session_state.questions[st.session_state.current_idx]
+        st.markdown(f"""
+        <div class="q-card">
+            <div class="q-text">{q['a']} {q['opt']} {q['b']} = ?</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 答案输入
+        st.session_state.user_ans = st.text_input("答案", value=st.session_state.user_ans, label_visibility="collapsed", placeholder="得数", key="ans_input")
+
+        # 操作按钮组
+        col_check, col_next, col_redo = st.columns(3)
+        with col_check:
+            if st.button("✅ 核对", key="check", use_container_width=True, type="primary"):
+                st.session_state.checked = True
+                st.session_state.total += 1
+                try:
+                    u = int(st.session_state.user_ans)
+                    if u == q["ans"]:
+                        st.session_state.right += 1
+                        st.success("🎉 回答正确！")
+                    else:
+                        st.error(f"❌ 正确答案：{q['ans']}")
+                        if not any(x["a"]==q["a"] and x["b"]==q["b"] and x["opt"]==q["opt"] for x in st.session_state.error_list):
+                            st.session_state.error_list.append(q)
+                except:
+                    st.warning("⚠️ 请输入数字！")
+        with col_next:
+            if st.button("➡️ 下一题", key="next", use_container_width=True):
+                if st.session_state.current_idx < len(st.session_state.questions)-1:
+                    st.session_state.current_idx += 1
+                    st.session_state.user_ans = ""
+                    st.session_state.checked = False
+                    st.rerun()
+                else:
+                    st.info("✅ 10道题已完成！")
+        with col_redo:
+            if st.button("📚 错题重做", key="redo", use_container_width=True):
+                if st.session_state.error_list:
+                    st.session_state.questions = st.session_state.error_list.copy()
+                    st.session_state.current_idx = 0
+                    st.session_state.user_ans = ""
+                    st.session_state.checked = False
+                    st.rerun()
+                else:
+                    st.info("暂无错题可重做~")
+    else:
+        st.markdown('<div class="tip-text">💡 点击“一键出10道题”开始练习</div>', unsafe_allow_html=True)
+
+    # 重置按钮
+    if st.button("🔄 重置数据", key="reset", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+    # 统计信息
+    acc = round(st.session_state.right/st.session_state.total*100) if st.session_state.total>0 else 0
+    st.markdown(f"""
+    <div class="stats-row">
+        <div class="stat-item">总题 {st.session_state.total}</div>
+        <div class="stat-item">做对 {st.session_state.right}</div>
+        <div class="stat-item">错题 {len(st.session_state.error_list)}</div>
+        <div class="stat-item">正确率 {acc}%</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
