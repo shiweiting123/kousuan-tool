@@ -1,0 +1,227 @@
+import streamlit as st
+
+# 页面基础设置
+st.set_page_config(page_title="AI口算错题本", layout="centered")
+
+# 自定义样式
+st.markdown("""
+<style>
+body {
+    background: linear-gradient(145deg, #f9f0d4 0%, #f4e5c1 100%);
+}
+.main-card {
+    background: #fffef7;
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(100,70,20,0.15);
+    border: 1px solid #e9d6a7;
+}
+.q-text {
+    font-size: 2.6rem;
+    color: #8b3c1c;
+    font-weight: bold;
+    text-align: center;
+    margin: 15px 0;
+}
+.feedback-correct {
+    background: #e2f3e2;
+    color: #1f6d2b;
+    padding: 10px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: bold;
+}
+.feedback-wrong {
+    background: #ffe6e6;
+    color: #b13e3e;
+    padding: 10px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: bold;
+}
+.weak-tag {
+    background: #e86c3a;
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin: 3px;
+    display: inline-block;
+    font-size: 0.8rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# 初始化会话状态
+if "total_count" not in st.session_state:
+    st.session_state.total_count = 0
+if "right_count" not in st.session_state:
+    st.session_state.right_count = 0
+if "error_list" not in st.session_state:
+    st.session_state.error_list = []
+if "current_q" not in st.session_state:
+    st.session_state.current_q = None
+if "is_answered" not in st.session_state:
+    st.session_state.is_answered = False
+if "level" not in st.session_state:
+    st.session_state.level = "基础"
+
+# 题型分类函数
+def get_kind(a, b, opt):
+    if opt == "+":
+        if (a % 10 + b % 10) >= 10:
+            return "carry_add"
+        else:
+            return "normal_add"
+    else:
+        if (a % 10) < (b % 10):
+            return "carry_sub"
+        else:
+            return "normal_sub"
+
+kind_map = {
+    "normal_add": {"text": "不进位加法", "color": "#e65100"},
+    "carry_add": {"text": "进位加法", "color": "#d83a34"},
+    "normal_sub": {"text": "不退位减法", "color": "#0a79a2"},
+    "carry_sub": {"text": "退位减法", "color": "#7e4bb2"}
+}
+
+# 生成题目函数
+def generate_question(level):
+    if level == "基础":
+        opt = "+" if st.session_state.opt == "+" else "-" if "opt" in st.session_state else ("+" if st.session_state.opt else "-")
+        if "opt" not in st.session_state:
+            import random
+            opt = "+" if random.random() > 0.5 else "-"
+        if opt == "+":
+            import random
+            a = random.randint(1, 10)
+            b = random.randint(1, 10)
+            ans = a + b
+            while ans > 20:
+                a = random.randint(1, 10)
+                b = random.randint(1, 10)
+                ans = a + b
+        else:
+            import random
+            a = random.randint(5, 15)
+            b = random.randint(1, 10)
+            ans = a - b
+            while ans < 0:
+                a = random.randint(5, 15)
+                b = random.randint(1, 10)
+                ans = a - b
+    elif level == "进阶":
+        import random
+        opt = "+" if random.random() > 0.5 else "-"
+        if opt == "+":
+            a = random.randint(10, 35)
+            b = random.randint(5, 30)
+            ans = a + b
+        else:
+            a = random.randint(15, 50)
+            b = random.randint(5, 30)
+            ans = a - b
+        if ans < 0:
+            return generate_question(level)
+    else: # 困难
+        import random
+        opt = "+" if random.random() > 0.5 else "-"
+        if opt == "+":
+            a = random.randint(30, 70)
+            b = random.randint(20, 60)
+            ans = a + b
+            while ans > 100:
+                a = random.randint(30, 70)
+                b = random.randint(20, 60)
+                ans = a + b
+        else:
+            a = random.randint(50, 99)
+            b = random.randint(10, 49)
+            ans = a - b
+            while ans < 0:
+                a = random.randint(50, 99)
+                b = random.randint(10, 49)
+                ans = a - b
+    kind = get_kind(a, b, opt)
+    return {"a": a, "b": b, "opt": opt, "ans": ans, "kind": kind}
+
+# 诊断薄弱点
+def diagnose_weakness():
+    error_list = st.session_state.error_list
+    if not error_list:
+        return "暂无错题，太棒啦！", ""
+    count = {"normal_add":0, "carry_add":0, "normal_sub":0, "carry_sub":0}
+    for q in error_list:
+        count[q["kind"]] += 1
+    tags = ""
+    for k in count:
+        if count[k] > 0:
+            tags += f'<span class="weak-tag" style="background:{kind_map[k]["color"]}">{kind_map[k]["text"]}：错{count[k]}道</span>'
+    return f"共{len(error_list)}道错题", tags
+
+# 主界面
+st.title("📚 AI口算错题本")
+
+# 选择难度
+level = st.radio("选择难度", ["基础", "进阶", "困难"], horizontal=True)
+st.session_state.level = level
+
+# 诊断卡片
+weak_tip, weak_tags = diagnose_weakness()
+with st.container():
+    st.markdown(f"""
+    <div class="main-card">
+        <div>AI薄弱诊断：{weak_tip}</div>
+        <div>{weak_tags}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# 题目区域
+if st.session_state.current_q is None:
+    if st.button("📝 开始做题", use_container_width=True):
+        st.session_state.current_q = generate_question(level)
+        st.session_state.is_answered = False
+        st.rerun()
+else:
+    q = st.session_state.current_q
+    st.markdown(f'<div class="q-text">{q["a"]} {q["opt"]} {q["b"]} = ?</div>', unsafe_allow_html=True)
+    user_ans = st.number_input("请输入答案", min_value=0, step=1, key="user_ans")
+
+    if not st.session_state.is_answered:
+        if st.button("✅ 核对答案", use_container_width=True):
+            st.session_state.is_answered = True
+            st.session_state.total_count += 1
+            if user_ans == q["ans"]:
+                st.session_state.right_count += 1
+                st.markdown(f'<div class="feedback-correct">🎉 回答正确！</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="feedback-wrong">❌ 正确答案是：{q["ans"]}</div>', unsafe_allow_html=True)
+                st.session_state.error_list.append(q)
+    else:
+        if st.button("➡️ 下一题", use_container_width=True):
+            st.session_state.current_q = generate_question(level)
+            st.session_state.is_answered = False
+            st.rerun()
+
+# 统计信息
+acc = round(st.session_state.right_count / st.session_state.total_count * 100) if st.session_state.total_count > 0 else 0
+with st.container():
+    st.markdown(f"""
+    <div class="main-card">
+        <div style="display:flex; justify-content:space-around; font-size:0.9rem;">
+            <div>总题数：{st.session_state.total_count}</div>
+            <div>做对：{st.session_state.right_count}</div>
+            <div>正确率：{acc}%</div>
+            <div>错题数：{len(st.session_state.error_list)}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# 重置按钮
+if st.button("🔄 重置数据", use_container_width=True):
+    st.session_state.total_count = 0
+    st.session_state.right_count = 0
+    st.session_state.error_list = []
+    st.session_state.current_q = None
+    st.session_state.is_answered = False
+    st.rerun()
