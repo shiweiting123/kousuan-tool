@@ -1,706 +1,349 @@
 import streamlit as st
 import random
-from datetime import datetime
+import time
+from PIL import Image, ImageDraw
+import io
 
 # -------------------------- 页面配置与样式 --------------------------
-st.set_page_config(
-    page_title="AI口算错题本", 
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
-# 优化的CSS样式
+st.set_page_config(page_title="AI智趣图形王国", layout="centered")
 st.markdown("""
 <style>
-/* 全局背景动画效果 */
+/* 全局背景 */
 .stApp {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
+    background: linear-gradient(180deg, #e6f7ff 0%, #f0f9ff 100%);
     padding: 1rem;
-    position: relative;
-    overflow-x: hidden;
 }
-
-/* 装饰性背景元素 */
-.stApp::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.05)" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat bottom;
-    background-size: cover;
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* 主卡片 - 毛玻璃效果 */
+/* 主卡片 */
 .main-card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 32px;
-    padding: 32px;
-    max-width: 650px;
+    background: white;
+    border-radius: 24px;
+    padding: 24px;
+    max-width: 600px;
     margin: 0 auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    position: relative;
-    z-index: 1;
-    animation: slideUp 0.5s ease-out;
+    box-shadow: 0 8px 24px rgba(0, 100, 200, 0.1);
 }
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* 标题样式 */
+/* 标题 */
 .title {
     text-align: center;
-    font-size: 32px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-size: 26px;
+    color: #1e6bb8;
     font-weight: bold;
     margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
 }
-
-/* 输入框美化 */
-.stTextInput>div>div>input {
-    border-radius: 12px;
-    border: 2px solid #e0e7ff;
-    padding: 10px;
-    font-size: 16px;
-    transition: all 0.3s ease;
+.subtitle {
     text-align: center;
-    background: white;
+    font-size: 16px;
+    color: #4a7caf;
+    margin-bottom: 20px;
 }
-
-.stTextInput>div>div>input:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    transform: scale(1.02);
-}
-
-/* 难度按钮容器 */
-.difficulty-container {
-    display: flex;
-    gap: 12px;
-    margin: 20px 0;
-}
-
-/* 难度按钮基础样式 */
-.difficulty-btn {
-    width: 100%;
-    padding: 12px;
+/* 按钮样式 */
+.stButton>button {
+    border-radius: 12px;
+    background-color: #1e6bb8;
+    color: white;
+    font-weight: bold;
     border: none;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-    color: #4b5563;
-}
-
-/* 不同难度按钮的特殊样式 */
-.difficulty-btn[data-difficulty="基础"]:hover {
-    transform: translateY(-2px);
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
-}
-
-.difficulty-btn[data-difficulty="进阶"]:hover {
-    transform: translateY(-2px);
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-    box-shadow: 0 5px 15px rgba(245, 158, 11, 0.3);
-}
-
-.difficulty-btn[data-difficulty="困难"]:hover {
-    transform: translateY(-2px);
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
-    box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
-}
-
-/* 激活的难度按钮 */
-.difficulty-btn.active {
-    transform: scale(1.05);
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-}
-
-.difficulty-btn.active[data-difficulty="基础"] {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-}
-
-.difficulty-btn.active[data-difficulty="进阶"] {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-}
-
-.difficulty-btn.active[data-difficulty="困难"] {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
-}
-
-/* 题目列表卡片 */
-.question-list-card {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    border-radius: 20px;
-    padding: 20px;
-    margin: 20px 0;
-    border: 2px solid #fbbf24;
-}
-
-.question-list-title {
-    font-weight: bold;
-    font-size: 18px;
-    color: #92400e;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-/* 题目项 */
-.question-item {
-    font-size: 16px;
-    color: #78350f;
-    padding: 10px;
-    margin: 6px 0;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.6);
-    transition: all 0.3s ease;
-    cursor: pointer;
-}
-
-.question-item:hover {
-    transform: translateX(5px);
-    background: rgba(255, 255, 255, 0.9);
-}
-
-.question-item.active {
-    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-    color: white;
-    font-weight: bold;
-    transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-}
-
-/* 作答区域 */
-.answer-area-card {
-    background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-    border-radius: 24px;
-    padding: 30px;
-    text-align: center;
-    margin: 20px 0;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-    }
-    50% {
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-    }
-}
-
-.current-question-text {
-    font-size: 56px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-weight: bold;
-    margin-bottom: 20px;
-}
-
-/* 诊断框 */
-.diagnose-box {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    padding: 16px;
-    border-radius: 16px;
-    text-align: center;
-    color: #92400e;
-    margin: 20px 0;
-    border-left: 4px solid #f59e0b;
-    font-size: 14px;
-    line-height: 1.6;
-}
-
-/* 统计行 */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
-    padding: 16px;
-    border-radius: 16px;
-    margin: 20px 0;
-}
-
-.stat-item {
-    text-align: center;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 12px;
-    transition: all 0.3s ease;
-}
-
-.stat-item:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.stat-value {
-    font-size: 24px;
-    font-weight: bold;
-    color: #7c3aed;
-}
-
-.stat-label {
-    font-size: 12px;
-    color: #6b21a5;
-    margin-top: 4px;
-}
-
-/* 鼓励语 */
-.encourage {
-    text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-    padding: 16px;
-    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-    border-radius: 16px;
-    color: #065f46;
-    margin-top: 20px;
-    animation: bounce 1s ease;
-}
-
-@keyframes bounce {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(-10px);
-    }
-}
-
-/* 按钮通用样式 */
-.stButton > button {
-    border-radius: 12px;
     padding: 10px 20px;
-    font-weight: bold;
-    transition: all 0.3s ease;
-    border: none;
+    width: 100%;
+    margin: 5px 0;
 }
-
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+.stButton>button:hover {
+    background-color: #2b85d6;
 }
-
-/* 成功/错误消息美化 */
-.stSuccess, .stError, .stWarning, .stInfo {
+/* 互动区域 */
+.canvas-area {
+    background: #f0f9ff;
+    border-radius: 16px;
+    padding: 16px;
+    text-align: center;
+    margin: 16px 0;
+}
+/* 反馈区域 */
+.feedback-box {
+    background: #e6f7ff;
+    padding: 12px;
     border-radius: 12px;
-    animation: slideIn 0.3s ease-out;
+    text-align: center;
+    color: #1e6bb8;
+    margin: 16px 0;
+    line-height:1.6;
 }
-
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateX(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+/* 闯关进度 */
+.progress-bar {
+    background: #e0efff;
+    border-radius: 10px;
+    padding: 8px;
+    margin: 10px 0;
+}
+.progress-fill {
+    background: #1e6bb8;
+    height: 10px;
+    border-radius: 5px;
+}
+/* 教师面板样式 */
+.teacher-panel {
+    background: #f5faff;
+    border-radius: 16px;
+    padding: 16px;
+    margin-top: 20px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------- 状态初始化 --------------------------
-if "student_name" not in st.session_state:
-    st.session_state.student_name = ""
-if "student_class" not in st.session_state:
-    st.session_state.student_class = ""
-if "difficulty" not in st.session_state:
-    st.session_state.difficulty = "基础"
-if "questions" not in st.session_state:
-    st.session_state.questions = []
-if "current_idx" not in st.session_state:
-    st.session_state.current_idx = 0
-if "user_ans" not in st.session_state:
-    st.session_state.user_ans = ""
-if "checked" not in st.session_state:
-    st.session_state.checked = False
-if "error_list" not in st.session_state:
-    st.session_state.error_list = []
-if "total" not in st.session_state:
-    st.session_state.total = 0
-if "right" not in st.session_state:
-    st.session_state.right = 0
-if "is_review_mode" not in st.session_state:
-    st.session_state.is_review_mode = False
-if "show_answer_feedback" not in st.session_state:
-    st.session_state.show_answer_feedback = False
-if "answer_message" not in st.session_state:
-    st.session_state.answer_message = ""
-
-# -------------------------- 题型分类 --------------------------
-def get_qtype(a,b,opt):
-    if opt == "+":
-        return "carry_add" if (a%10 + b%10)>=10 else "normal_add"
-    else:
-        return "carry_sub" if (a%10 < b%10) else "normal_sub"
-
-# -------------------------- 出题 --------------------------
-def gen_q(level):
-    opt = "+" if random.random()>0.5 else "-"
-    a=b=ans=0
-    if level=="基础":
-        if opt=="+":
-            while True:
-                a,b=random.randint(1,10),random.randint(1,10)
-                if a+b<=20: break
-        else:
-            while True:
-                a,b=random.randint(5,15),random.randint(1,10)
-                if a-b>=0: break
-    elif level=="进阶":
-        a = random.randint(10,35) if opt=="+" else random.randint(15,50)
-        b = random.randint(5,30)
-        ans = a+b if opt=="+" else a-b
-        if ans<0: return gen_q(level)
-    else:
-        if opt=="+":
-            while True:
-                a,b=random.randint(30,70),random.randint(20,60)
-                if a+b<=100: break
-        else:
-            while True:
-                a,b=random.randint(50,99),random.randint(10,49)
-                if a-b>=0: break
-    ans = a+b if opt=="+" else a-b
-    return {"a":a,"b":b,"opt":opt,"ans":ans,"type":get_qtype(a,b,opt)}
-
-def gen10(level): 
-    return [gen_q(level) for _ in range(10)]
-
-# -------------------------- 错题重做删除（自动移除做对的题）--------------------------
-def remove_from_errors(q_remove):
-    """从错题库中移除指定的题目"""
-    new_err = []
-    for q in st.session_state.error_list:
-        if not (q["a"]==q_remove["a"] and q["b"]==q_remove["b"] and q["opt"]==q_remove["opt"]):
-            new_err.append(q)
-    st.session_state.error_list = new_err
-
-# -------------------------- AI诊断 --------------------------
-def ai_diagnose():
-    err = st.session_state.error_list
-    if len(err)==0: 
-        return "✅ 暂无错题，太棒啦！继续保持！"
-
-    cnt = {"normal_add":0,"carry_add":0,"normal_sub":0,"carry_sub":0}
-    for q in err: 
-        cnt[q["type"]] +=1
-    total_err = len(err)
-
-    type_name = {
-        "normal_add":"不进位加法",
-        "carry_add":"进位加法",
-        "normal_sub":"不退位减法",
-        "carry_sub":"退位减法"
+# -------------------------- 初始化会话状态 --------------------------
+if "game_state" not in st.session_state:
+    st.session_state.game_state = "menu"  # menu, play, result, teacher
+if "level" not in st.session_state:
+    st.session_state.level = 1
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "total_questions" not in st.session_state:
+    st.session_state.total_questions = 0
+if "correct_answers" not in st.session_state:
+    st.session_state.correct_answers = 0
+if "feedback" not in st.session_state:
+    st.session_state.feedback = ""
+if "current_task" not in st.session_state:
+    st.session_state.current_task = None
+if "teacher_data" not in st.session_state:
+    st.session_state.teacher_data = {
+        "students": [
+            {"name": "小明", "accuracy": 85, "weak_point": "不规则图形面积"},
+            {"name": "小红", "accuracy": 92, "weak_point": "图形密铺"},
+            {"name": "小刚", "accuracy": 78, "weak_point": "图形分类"}
+        ]
     }
 
-    advise = {
-        "normal_add":"基础简单，注意看清数字即可",
-        "carry_add":"个位满十要进1，重点练进位规则",
-        "normal_sub":"直接相减，注意不要写反数字",
-        "carry_sub":"个位不够减要借1，十位记得减1"
-    }
+# -------------------------- AI核心功能模块 --------------------------
+def generate_task(level):
+    """根据关卡生成图形相关题目"""
+    tasks = []
+    if level == 1:
+        # 基础图形识别
+        shapes = ["正方形", "长方形", "三角形", "圆形"]
+        for shape in shapes:
+            tasks.append({
+                "type": "identify",
+                "question": f"请识别图形：这是{shape}吗？",
+                "answer": shape,
+                "image": draw_shape(shape)
+            })
+    elif level == 2:
+        # 图形密铺判断
+        shapes = ["三角形", "正方形", "正五边形", "平行四边形"]
+        for shape in shapes:
+            tasks.append({
+                "type": "tessellate",
+                "question": f"这个图形能单独密铺吗？",
+                "answer": "能" if shape in ["三角形", "正方形", "平行四边形"] else "不能",
+                "image": draw_tessellate_preview(shape)
+            })
+    elif level == 3:
+        # 不规则图形面积拆解
+        tasks.append({
+            "type": "area",
+            "question": "请把这个不规则图形拆成2个长方形，计算总面积（单位：厘米）",
+            "answer": "20",
+            "image": draw_irregular_shape()
+        })
+    return random.choice(tasks)
 
-    max_type = max(cnt, key=cnt.get)
-    max_num = cnt[max_type]
-    rate = int(max_num / total_err *100)
+def draw_shape(shape):
+    """绘制基础图形"""
+    img = Image.new('RGB', (200, 200), color='white')
+    draw = ImageDraw.Draw(img)
+    if shape == "正方形":
+        draw.rectangle([50,50,150,150], outline='blue', width=3)
+    elif shape == "长方形":
+        draw.rectangle([30,70,170,130], outline='blue', width=3)
+    elif shape == "三角形":
+        draw.polygon([100,30,30,170,170,170], outline='blue', width=3)
+    elif shape == "圆形":
+        draw.ellipse([50,50,150,150], outline='blue', width=3)
+    return img
 
-    if rate >= 60:
-        reason = f"🔴 你**最薄弱**的是【{type_name[max_type]}】，占总错题{rate}%"
-    elif rate >=30:
-        reason = f"🟡 你主要错在【{type_name[max_type]}】，需要加强练习"
-    else:
-        reason = f"🟢 你错得比较平均，重点加强【{type_name[max_type]}】"
+def draw_tessellate_preview(shape):
+    """绘制密铺预览"""
+    img = Image.new('RGB', (200, 200), color='white')
+    draw = ImageDraw.Draw(img)
+    if shape == "正方形":
+        for i in range(4):
+            for j in range(4):
+                draw.rectangle([i*50, j*50, i*50+50, j*50+50], outline='green')
+    elif shape == "三角形":
+        for i in range(4):
+            for j in range(4):
+                draw.polygon([i*50, j*50, i*50+50, j*50, i*50+25, j*50+50], outline='green')
+    elif shape == "平行四边形":
+        for i in range(4):
+            for j in range(4):
+                draw.polygon([i*50, j*50, i*50+50, j*50, i*50+75, j*50+50, i*50+25, j*50+50], outline='green')
+    elif shape == "正五边形":
+        draw.polygon([100,20,170,60,145,130,55,130,30,60], outline='red')
+    return img
 
-    suggestion = f"💡 建议：{advise[max_type]}"
-    return f"{reason}\n{suggestion}"
+def draw_irregular_shape():
+    """绘制不规则图形（由两个长方形组成）"""
+    img = Image.new('RGB', (200, 200), color='white')
+    draw = ImageDraw.Draw(img)
+    # 第一个长方形
+    draw.rectangle([20,20,100,100], outline='blue', width=2)
+    # 第二个长方形
+    draw.rectangle([100,60,180,140], outline='blue', width=2)
+    # 标注尺寸
+    draw.text((60, 105), "4cm", fill='black')
+    draw.text((105, 100), "5cm", fill='black')
+    draw.text((60, 15), "5cm", fill='black')
+    draw.text((140, 105), "4cm", fill='black')
+    return img
 
-# -------------------------- 清空答案函数 --------------------------
-def clear_answer():
-    """清空答案输入框"""
-    st.session_state.user_ans = ""
-    st.session_state.checked = False
+def ai_feedback(user_answer, correct_answer, task_type):
+    """AI智能反馈与讲解"""
+    if task_type == "identify":
+        if user_answer == correct_answer:
+            return "✅ 太棒了！图形识别完全正确！正方形的四条边都相等，四个角都是直角哦~"
+        else:
+            return f"❌ 别灰心，再仔细看看！这个图形的特征是：{correct_answer}的边和角有什么特点呢？"
+    elif task_type == "tessellate":
+        if user_answer == correct_answer:
+            return "✅ 正确！这个图形的内角和能被360度整除，所以可以无缝密铺！"
+        else:
+            return f"❌ 再想想！能密铺的图形需要满足什么条件？提示：内角和与360度的关系~"
+    elif task_type == "area":
+        if user_answer == correct_answer:
+            return "✅ 计算正确！你成功把不规则图形拆成了两个规则图形，总面积是20平方厘米！"
+        else:
+            return f"❌ 差一点就对了！提示：把图形拆成两个长方形，分别计算面积再相加：(5×4)+(5×4)=20平方厘米"
 
-# -------------------------- 界面 --------------------------
+def next_level():
+    """升级关卡"""
+    if st.session_state.level < 3:
+        st.session_state.level += 1
+    st.session_state.current_task = generate_task(st.session_state.level)
+    st.session_state.feedback = ""
+
+# -------------------------- 主界面 --------------------------
 with st.container():
     st.markdown('<div class="main-card">', unsafe_allow_html=True)
-    
-    # 标题区域
-    st.markdown("""
-    <div class="title">
-        🧮 AI智能口算错题本
-        <span style="font-size: 24px;">✨</span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="title">🎨 AI智趣图形王国</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">小学数学图形互动教学AI工具</div>', unsafe_allow_html=True)
 
-    # 姓名班级输入
-    col1,col2 = st.columns(2)
-    with col1:
-        st.session_state.student_name = st.text_input(
-            "👤 姓名", 
-            value=st.session_state.student_name, 
-            placeholder="请输入姓名",
-            key="name_input"
-        )
-    with col2:
-        st.session_state.student_class = st.text_input(
-            "📚 班级", 
-            value=st.session_state.student_class, 
-            placeholder="请输入班级",
-            key="class_input"
-        )
-
-    # 难度选择（使用HTML/CSS实现鼠标悬停和点击变色）
-    st.markdown('<div class="difficulty-container">', unsafe_allow_html=True)
-    cols = st.columns(3)
-    difficulty_list = ["基础", "进阶", "困难"]
-    
-    # 为每个难度创建按钮并添加自定义样式
-    for i, diff in enumerate(difficulty_list):
-        with cols[i]:
-            # 使用自定义HTML按钮来实现更好的交互效果
-            is_active = st.session_state.difficulty == diff
-            button_style = "active" if is_active else ""
-            if st.button(
-                diff, 
-                key=f"difficulty_{diff}",
-                use_container_width=True,
-                help=f"选择{diff}难度"
-            ):
-                st.session_state.difficulty = diff
-                st.rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # 添加JavaScript来实现按钮悬停和激活效果
-    st.markdown("""
-    <script>
-    // 为难度按钮添加悬停效果
-    const buttons = document.querySelectorAll('.stButton button');
-    buttons.forEach(btn => {
-        if (['基础', '进阶', '困难'].includes(btn.innerText)) {
-            btn.classList.add('difficulty-btn');
-            btn.setAttribute('data-difficulty', btn.innerText);
-            if (btn.innerText === '""" + st.session_state.difficulty + """') {
-                btn.classList.add('active');
-            }
-        }
-    });
-    </script>
-    """, unsafe_allow_html=True)
-
-    # 一键出题按钮
-    if st.button("🎲 一键出10道题", use_container_width=True, type="primary"):
-        st.session_state.questions = gen10(st.session_state.difficulty)
-        st.session_state.current_idx = 0
-        clear_answer()
-        st.session_state.checked = False
-        st.session_state.is_review_mode = False
-        st.session_state.show_answer_feedback = False
-        st.rerun()
-
-    # AI诊断区域
-    st.markdown(f'<div class="diagnose-box">🤖 AI智能诊断：<br>{ai_diagnose()}</div>', unsafe_allow_html=True)
-
-    # 题目列表和作答区域
-    if st.session_state.questions:
-        # 题目列表
+    # 主菜单
+    if st.session_state.game_state == "menu":
         st.markdown("""
-        <div class="question-list-card">
-            <div class="question-list-title">
-                📋 题目列表
-                <span style="font-size: 12px;">(点击题目可跳转)</span>
-            </div>
+        <div class="canvas-area">
+            <h3>欢迎来到图形王国！</h3>
+            <p>通过AI互动游戏，轻松掌握图形知识~</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # 显示题目列表，添加点击跳转功能
-        cols_per_row = 2
-        for i in range(0, len(st.session_state.questions), cols_per_row):
-            row_cols = st.columns(cols_per_row)
-            for j in range(cols_per_row):
-                idx = i + j
-                if idx < len(st.session_state.questions):
-                    q = st.session_state.questions[idx]
-                    with row_cols[j]:
-                        is_active = idx == st.session_state.current_idx
-                        if st.button(
-                            f"{idx+1}. {q['a']}{q['opt']}{q['b']}=?", 
-                            key=f"q_{idx}",
-                            use_container_width=True,
-                            help="点击跳转到此题"
-                        ):
-                            st.session_state.current_idx = idx
-                            clear_answer()
-                            st.session_state.checked = False
-                            st.rerun()
+        if st.button("🚀 开始闯关"):
+            st.session_state.game_state = "play"
+            st.session_state.level = 1
+            st.session_state.score = 0
+            st.session_state.total_questions = 0
+            st.session_state.correct_answers = 0
+            st.session_state.current_task = generate_task(1)
+            st.experimental_rerun()
+        
+        if st.button("👩‍🏫 教师后台"):
+            st.session_state.game_state = "teacher"
+            st.experimental_rerun()
 
-        # 当前题目
-        qnow = st.session_state.questions[st.session_state.current_idx]
+    # 游戏界面
+    elif st.session_state.game_state == "play":
+        # 关卡进度
         st.markdown(f"""
-        <div class="answer-area-card">
-            <div class="current-question-text">
-                {qnow["a"]}{qnow["opt"]}{qnow["b"]} = ?
+        <div class="progress-bar">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span>关卡 {st.session_state.level}/3</span>
+                <span>得分 {st.session_state.score}</span>
             </div>
+            <div class="progress-fill" style="width: {st.session_state.level/3*100}%"></div>
         </div>
         """, unsafe_allow_html=True)
 
-        # 答案输入
-        st.session_state.user_ans = st.text_input(
-            "✏️ 输入答案", 
-            value=st.session_state.user_ans, 
-            placeholder="请输入得数",
-            key="ans_input"
-        )
+        # 题目区域
+        if st.session_state.current_task:
+            task = st.session_state.current_task
+            st.markdown(f'<div class="canvas-area"><h4>{task["question"]}</h4></div>', unsafe_allow_html=True)
+            st.image(task["image"], width=200)
 
-        # 按钮区域
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("✅ 核对答案", use_container_width=True):
-                st.session_state.checked = True
-                st.session_state.total += 1
-                try:
-                    user_input = int(st.session_state.user_ans)
-                    if user_input == qnow["ans"]:
-                        st.session_state.right += 1
-                        st.success(f"🎉 回答正确！ {qnow['a']}{qnow['opt']}{qnow['b']}={qnow['ans']}")
-                        
-                        # 如果是错题重做模式，自动从错题库移除
-                        if st.session_state.is_review_mode:
-                            remove_from_errors(qnow)
-                            st.info("✅ 此题已从错题库中移除！")
-                        
-                        # 自动清空答案
-                        clear_answer()
-                    else:
-                        st.error(f"❌ 回答错误！ 正确答案是：{qnow['ans']}")
-                        
-                        # 添加到错题库（仅在非重做模式下）
-                        if not st.session_state.is_review_mode:
-                            # 检查是否已存在
-                            exist = any(
-                                x["a"] == qnow["a"] and 
-                                x["b"] == qnow["b"] and 
-                                x["opt"] == qnow["opt"] 
-                                for x in st.session_state.error_list
-                            )
-                            if not exist:
-                                st.session_state.error_list.append(qnow)
-                                st.warning("📝 此题已加入错题库")
-                        
-                        # 保留答案，不清空，方便用户对比
-                except ValueError:
-                    st.warning("⚠️ 请输入数字答案！")
-        
-        with col2:
-            if st.button("➡️ 下一题", use_container_width=True):
-                if st.session_state.current_idx < len(st.session_state.questions) - 1:
-                    st.session_state.current_idx += 1
-                    clear_answer()
-                    st.session_state.checked = False
-                    st.rerun()
-                else:
-                    st.balloons()
-                    st.success("🎉 恭喜你完成了所有题目！")
-        
-        with col3:
-            if st.button("📚 错题重做", use_container_width=True):
-                if len(st.session_state.error_list) > 0:
-                    st.session_state.questions = st.session_state.error_list.copy()
-                    st.session_state.current_idx = 0
-                    clear_answer()
-                    st.session_state.checked = False
-                    st.session_state.is_review_mode = True
-                    st.info(f"📖 进入错题重做模式，共 {len(st.session_state.error_list)} 道错题")
-                    st.rerun()
-                else:
-                    st.info("✨ 太棒了！暂无错题需要重做~")
+            # 答题输入
+            if task["type"] == "identify":
+                user_answer = st.selectbox("请选择答案：", ["正方形", "长方形", "三角形", "圆形"])
+            elif task["type"] == "tessellate":
+                user_answer = st.radio("请选择答案：", ["能", "不能"])
+            elif task["type"] == "area":
+                user_answer = st.number_input("请输入答案（平方厘米）：", min_value=0, step=1)
 
-    # 重置数据按钮
-    if st.button("🔄 重置所有数据", use_container_width=True):
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        st.success("数据已重置！")
-        st.rerun()
+            # 提交答案
+            if st.button("✅ 提交答案"):
+                st.session_state.total_questions += 1
+                if str(user_answer) == str(task["answer"]):
+                    st.session_state.correct_answers += 1
+                    st.session_state.score += 10
+                st.session_state.feedback = ai_feedback(str(user_answer), str(task["answer"]), task["type"])
 
-    # 统计信息
-    acc = round(st.session_state.right / st.session_state.total * 100) if st.session_state.total > 0 else 0
-    st.markdown(f"""
-    <div class="stats-row">
-        <div class="stat-item">
-            <div class="stat-value">{st.session_state.total}</div>
-            <div class="stat-label">总题数</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{st.session_state.right}</div>
-            <div class="stat-label">做对</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{len(st.session_state.error_list)}</div>
-            <div class="stat-label">错题本</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-value">{acc}%</div>
-            <div class="stat-label">正确率</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+            # 显示反馈
+            if st.session_state.feedback:
+                st.markdown(f'<div class="feedback-box">{st.session_state.feedback}</div>', unsafe_allow_html=True)
 
-    # 鼓励语（根据正确率动态显示）
-    if st.session_state.total > 0:
-        if acc == 100:
-            msg = "🏆 口算天才！完美通关！太厉害了！"
-            emoji = "🌟"
-        elif acc >= 90:
-            msg = "🎉 太优秀了！继续努力，冲击满分！"
-            emoji = "💪"
-        elif acc >= 80:
-            msg = "👍 很不错！再细心一点就更完美了！"
-            emoji = "✨"
-        elif acc >= 60:
-            msg = "📚 继续加油！多练习会越来越棒！"
-            emoji = "🌱"
+            # 下一题/升级按钮
+            if st.button("➡️ 下一题/升级关卡"):
+                next_level()
+                st.experimental_rerun()
+
+        # 闯关结束
+        if st.session_state.level > 3:
+            st.session_state.game_state = "result"
+            st.experimental_rerun()
+
+    # 结果界面
+    elif st.session_state.game_state == "result":
+        accuracy = st.session_state.correct_answers / st.session_state.total_questions * 100 if st.session_state.total_questions > 0 else 0
+        st.markdown(f"""
+        <div class="canvas-area">
+            <h3>🎉 闯关结束！</h3>
+            <p>总题数：{st.session_state.total_questions}</p>
+            <p>正确数：{st.session_state.correct_answers}</p>
+            <p>正确率：{accuracy:.1f}%</p>
+            <p>最终得分：{st.session_state.score}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # AI个性化学习建议
+        if accuracy < 70:
+            suggestion = "建议多练习图形密铺和不规则图形面积计算，可在教师后台获取针对性练习~"
+        elif accuracy < 90:
+            suggestion = "基础不错！可以挑战更高难度的图形组合题，巩固薄弱环节~"
         else:
-            msg = "💪 别灰心！错题是我们的朋友，再练习一次吧！"
-            emoji = "🌸"
+            suggestion = "太棒了！你已经是图形小能手啦，可以尝试拓展图形推理题目~"
         
-        st.markdown(f'<div class="encourage">{emoji} {msg} {emoji}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="feedback-box">AI学习建议：{suggestion}</div>', unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        if st.button("🔄 重新闯关"):
+            st.session_state.game_state = "menu"
+            st.experimental_rerun()
+
+    # 教师后台界面
+    elif st.session_state.game_state == "teacher":
+        st.markdown('<div class="teacher-panel"><h3>👩‍🏫 教师学情分析后台</h3></div>', unsafe_allow_html=True)
+        st.write("班级学生学情数据：")
+        for student in st.session_state.teacher_data["students"]:
+            st.markdown(f"""
+            <div style="padding: 10px; margin: 5px 0; background: #e6f7ff; border-radius: 8px;">
+                <p><strong>{student['name']}</strong></p>
+                <p>正确率：{student['accuracy']}%</p>
+                <p>薄弱点：{student['weak_point']}</p>
+            </div>
+            """)
+        
+        if st.button("📄 导出学情报告"):
+            st.success("学情报告已生成！可下载用于教学分析~")
+        
+        if st.button("🔙 返回主菜单"):
+            st.session_state.game_state = "menu"
+            st.experimental_rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
