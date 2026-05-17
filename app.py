@@ -75,13 +75,13 @@ with col1:
     st.session_state.student_name = st.text_input(
         "姓名", 
         value=st.session_state.student_name,
-        autocomplete="off"  # 关键：禁用下拉历史
+        autocomplete="off"
     )
 with col2:
     st.session_state.student_class = st.text_input(
         "班级", 
         value=st.session_state.student_class,
-        autocomplete="off"  # 关键：禁用下拉历史
+        autocomplete="off"
     )
 
 # 难度选择
@@ -122,14 +122,15 @@ if st.session_state.questions:
         st.subheader(f"第 {q_idx + 1}/{len(st.session_state.questions)} 题")
         st.markdown(f"### {q['question']}")
         
-        # 答案输入框（已禁用自动填充）
-        user_ans = st.number_input(
+        # 用text_input代替number_input，同时禁用自动填充
+        user_ans_str = st.text_input(
             "你的答案", 
-            value=None, 
-            step=1, 
             key=f"ans_{q_idx}",
-            autocomplete="off"  # 关键：禁用数字下拉历史
+            autocomplete="off"
         )
+        user_ans = None
+        if user_ans_str.strip().isdigit():
+            user_ans = int(user_ans_str)
         
         if st.button("提交答案", use_container_width=True):
             if user_ans is not None:
@@ -138,18 +139,17 @@ if st.session_state.questions:
                 if user_ans == q["answer"]:
                     st.success("✅ 回答正确！太棒了！")
                     st.session_state.correct_count += 1
-                    # 错题重做模式下，做对的题目移除出错题库
                     if st.session_state.mode == "错题重做":
                         if q in st.session_state.wrong_questions:
                             st.session_state.wrong_questions.remove(q)
                 else:
                     st.error(f"❌ 回答错误，正确答案是：{q['answer']}")
-                    # 错题去重添加
                     if q not in st.session_state.wrong_questions:
                         st.session_state.wrong_questions.append(q)
-                # 下一题
                 st.session_state.current_q_idx += 1
                 st.rerun()
+            else:
+                st.warning("请输入有效的数字答案哦！")
     else:
         # 练习结束，显示结果
         st.balloons()
